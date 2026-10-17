@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "mysql"
+}
+enum Role {
+  ADMIN
+  SALES
+}
+enum Stage {
+  NEW
+  CONTACTED
+  DEMO_SCHEDULED
+  PROPOSAL_SENT
+  WON
+  LOST
+}
+model User {
+  id Int @id @default(autoincrement())
+  name String @db.VarChar(120)
+  email String @unique @db.VarChar(190)
+  passwordHash String @db.VarChar(255)
+  role Role @default(SALES)
+  isDemo Boolean @default(false)
+  demoExpiresAt DateTime?
+  companies Company[]
+  opportunities Opportunity[]
+  tasks Task[]
+  notes Note[]
+  sessions Session[]
+  @@index([isDemo,demoExpiresAt])
+}
+model Session {
+  id String @id @db.VarChar(64)
+  userId Int?
+  user User? @relation(fields:[userId],references:[id],onDelete:Cascade)
+  csrf String @db.VarChar(64)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model Company {
+  id Int @id @default(autoincrement())
+  name String @db.VarChar(160)
+  industry String @db.VarChar(120)
+  website String @db.VarChar(500)
+  phone String @db.VarChar(50)
+  assignedToId Int
+  assignedTo User @relation(fields:[assignedToId],references:[id],onDelete:Restrict)
+  contacts Contact[]
+  opportunities Opportunity[]
+  @@index([assignedToId,name])
+  @@unique([id,assignedToId])
+}
+model Contact {
+  id Int @id @default(autoincrement())
+  name String @db.VarChar(160)
+  jobTitle String @db.VarChar(120)
+  email String @db.VarChar(190)
+  phone String @db.VarChar(50)
+  companyId Int
+  company Company @relation(fields:[companyId],references:[id],onDelete:Restrict)
+  opportunities Opportunity[]
+  @@index([companyId,name])
+  @@unique([id,companyId])
+}
+model Opportunity {
+  id Int @id @default(autoincrement())
+  title String @db.VarChar(160)
+  companyId Int
+  company Company @relation(fields:[companyId,assignedToId],references:[id,assignedToId],onDelete:Restrict,onUpdate:Restrict)
+  contactId Int?
+  contact Contact? @relation(fields:[contactId,companyId],references:[id,companyId],onDelete:Restrict,onUpdate:Restrict)
+  assignedToId Int
+  assignedTo User @relation(fields:[assignedToId],references:[id],onDelete:Restrict)
+  value Decimal @db.Decimal(14,2)
+  expectedCloseDate DateTime @db.Date
+  stage Stage @default(NEW)
+  description String @db.Text
+  notes Note[]
+  tasks Task[]
+  @@index([assignedToId,stage])
+  @@unique([id,assignedToId])
+}
+model Note {
+  id Int @id @default(autoincrement())
+  body String @db.Text
+  createdAt DateTime @default(now())
+  authorId Int
+  author User @relation(fields:[authorId],references:[id],onDelete:Restrict)
+  opportunityId Int
+  opportunity Opportunity @relation(fields:[opportunityId],references:[id],onDelete:Restrict)
+  @@index([opportunityId,createdAt])
+}
+model Task {
+  id Int @id @default(autoincrement())
+  title String @db.VarChar(160)
+  dueDate DateTime @db.Date
+  completed Boolean @default(false)
+  assignedToId Int
+  assignedTo User @relation(fields:[assignedToId],references:[id],onDelete:Restrict)
+  opportunityId Int
+  opportunity Opportunity @relation(fields:[opportunityId,assignedToId],references:[id,assignedToId],onDelete:Restrict,onUpdate:Restrict)
+  @@index([assignedToId,completed,dueDate])
+}

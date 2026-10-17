@@ -1,0 +1,38 @@
+{
+  "dataset": "Fictional review fixtures in a separate review test database",
+  "pageSize": 10,
+  "authorizedMatchingOpportunities": 12,
+  "firstPageCards": 10,
+  "firstPageColumnCounts": [
+    2,
+    2,
+    2,
+    2,
+    1,
+    1
+  ],
+  "secondPageCards": 2,
+  "secondPageColumnCounts": [
+    0,
+    0,
+    0,
+    1,
+    1,
+    0
+  ],
+  "stageOrder": [
+    "NEW",
+    "CONTACTED",
+    "DEMO_SCHEDULED",
+    "PROPOSAL_SENT",
+    "WON",
+    "LOST"
+  ],
+  "adminSummary": {
+    "companies": 4,
+    "openOpportunities": 9,
+    "openValue": "277050",
+    "wonValue": "74500",
+    "overdueTasks": 2
+  }
+}
