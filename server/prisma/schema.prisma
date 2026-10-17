@@ -103,3 +103,10 @@ model Task {
   opportunity Opportunity @relation(fields:[opportunityId,assignedToId],references:[id,assignedToId],onDelete:Restrict,onUpdate:Restrict)
   @@index([assignedToId,completed,dueDate])
 }
+
+model PublicRateBucket {
+  key String @id @db.VarChar(120)
+  hits Int @default(0)
+  expiresAt DateTime
+  @@index([expiresAt])
+}

@@ -21,7 +21,11 @@
     "db:generate": "npm run db:generate -w server",
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
-    "demo:cleanup": "npm run demo:cleanup -w server"
+    "demo:cleanup": "npm run demo:cleanup -w server",
+    "start": "npm run start -w server",
+    "build:production": "npm run db:generate && npm run build",
+    "demo:cleanup:production": "node server/dist/src/cleanup-demos.js",
+    "test:production": "node scripts/production-smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

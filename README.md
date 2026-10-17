@@ -147,3 +147,5 @@ Access expires after one hour without renewal. Demo creation is limited to five 
 ## Independent review package
 
 The [review guide](documentation/review-guide.md) maps code and evidence for independent review. It includes a [15-screen screenshot index](documentation/screenshots/README.md), [exact verification results and pipeline pagination semantics](documentation/verification.md), and reproducible tools for fictional review fixtures, captures, and a source-only ZIP. Existing ZIPs and their 15 screenshots are historical snapshots from before the visitor-demo feature; current visitor-demo evidence is listed separately in the verification document. Actual credentials and runtime data are excluded; reviewers supply their own local environment.
+
+Deployment preparation: see [Railway setup](documentation/railway.md). No application deployment is configured or performed by GitHub Actions.

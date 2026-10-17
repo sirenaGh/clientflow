@@ -22,7 +22,7 @@ Migration `202610170002_visitor_demo` adds `User.isDemo` (default false), nullab
 
 Workspace and session expiry are fixed to **one hour from provisioning**, enforced independently by the server. Extending a session row cannot extend its workspace. Activity, reload and session lookup do not renew access. Exit expires the workspace early and deletes its sessions. The client uses the existing expiry recovery flow and never replays a failed mutation automatically.
 
-Creation uses exact Origin validation and the existing anonymous session-bound CSRF flow. Cookies remain HttpOnly and SameSite=Lax, with Secure in production. Authenticated users must exit first. The endpoint allows **five attempts per IP per hour**, using the existing per-process limiter. Shared limiting, explicit reverse-proxy settings, and aggregate provisioning controls remain prerequisites to assess before public/multi-instance hosting.
+Creation uses exact Origin validation and the existing anonymous session-bound CSRF flow. Cookies remain HttpOnly and SameSite=Lax, with Secure in production. Authenticated users must exit first. Development allows **five attempts per IP per hour**. Production uses shared MySQL limits: 30 global demo attempts/hour and five per anonymous session/hour, plus bounded session/login requests. Forwarded client headers are not trusted. See [Railway preparation](railway.md) for settings and tradeoffs.
 
 Limits include sample records:
 
