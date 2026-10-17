@@ -4,6 +4,9 @@ import express, {
   type NextFunction,
 } from "express";
 import helmet from "helmet";
+import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { publicLimit } from "./public-limits.js";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import {
@@ -34,6 +37,13 @@ if (!secret || secret.length < 32 || secret.startsWith("REPLACE_"))
   throw new Error("SESSION_SECRET must contain at least 32 characters");
 const origin = process.env.APP_ORIGIN || "http://127.0.0.1:5173";
 const production = process.env.NODE_ENV === "production";
+if (
+  production &&
+  (!process.env.APP_ORIGIN ||
+    new URL(origin).protocol !== "https:" ||
+    new URL(origin).origin !== origin)
+)
+  throw new Error("APP_ORIGIN must be an exact HTTPS origin in production");
 const cookieName = production ? "__Host-clientflow" : "clientflow";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 const signature = (s: string) =>
@@ -185,6 +195,16 @@ const paging = z.object({
 const pageSize = 10;
 export const app = express();
 app.disable("x-powered-by");
+// No forwarding headers are trusted. Cookies and CSRF use explicit configuration.
+app.set("trust proxy", false);
+app.get("/health", async (_req, res) => {
+  try {
+    await db.$queryRaw`SELECT 1`;
+    res.set("Cache-Control", "no-store").json({ status: "ok" });
+  } catch {
+    res.status(503).json({ status: "unavailable" });
+  }
+});
 app.use(helmet());
 app.use(express.json({ limit: "64kb" }));
 app.use(cookieParser());
@@ -245,12 +265,15 @@ const publicUser = (u: User) => ({
   isDemo: u.isDemo,
   demoExpiresAt: u.demoExpiresAt,
 });
-app.get("/api/auth/session", async (req, res) =>
-  res.json({
-    demoEnabled: demoEnabled(),
-    user: req.actor ? publicUser(req.actor) : null,
-    csrf: req.csrf || (await newSession(res)),
-  }),
+app.get(
+  "/api/auth/session",
+  publicLimit("session", 600, 60 * 60 * 1000),
+  async (req, res) =>
+    res.json({
+      demoEnabled: demoEnabled(),
+      user: req.actor ? publicUser(req.actor) : null,
+      csrf: req.csrf || (await newSession(res)),
+    }),
 );
 app.use("/api", (req, _res, next) => {
   if (!req.actor && !["/auth/login", "/auth/demo"].includes(req.path))
@@ -277,28 +300,32 @@ const loginLimit = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many login attempts. Try again in 15 minutes." },
 });
-app.post("/api/auth/login", loginLimit, async (req, res) => {
-  const input = z
-    .object({
-      email: z
-        .email()
-        .max(190)
-        .transform((s) => s.toLowerCase()),
-      password: z.string().min(1).max(256),
-    })
-    .parse(req.body);
-  const user = await db.user.findUnique({ where: { email: input.email } });
-  // A real hash verification also runs for unknown accounts to reduce timing differences.
-  const valid =
-    user && !user.isDemo
-      ? await argon2.verify(user.passwordHash, input.password)
-      : await argon2.verify(await dummyHash, input.password);
-  if (!user || user.isDemo || !valid)
-    fail(401, "Email or password is incorrect");
-  if (req.sessionKey)
-    await db.session.deleteMany({ where: { id: req.sessionKey } });
-  res.json({ user: publicUser(user), csrf: await newSession(res, user.id) });
-});
+app.post(
+  "/api/auth/login",
+  production ? publicLimit("login", 100, 15 * 60 * 1000) : loginLimit,
+  async (req, res) => {
+    const input = z
+      .object({
+        email: z
+          .email()
+          .max(190)
+          .transform((s) => s.toLowerCase()),
+        password: z.string().min(1).max(256),
+      })
+      .parse(req.body);
+    const user = await db.user.findUnique({ where: { email: input.email } });
+    // A real hash verification also runs for unknown accounts to reduce timing differences.
+    const valid =
+      user && !user.isDemo
+        ? await argon2.verify(user.passwordHash, input.password)
+        : await argon2.verify(await dummyHash, input.password);
+    if (!user || user.isDemo || !valid)
+      fail(401, "Email or password is incorrect");
+    if (req.sessionKey)
+      await db.session.deleteMany({ where: { id: req.sessionKey } });
+    res.json({ user: publicUser(user), csrf: await newSession(res, user.id) });
+  },
+);
 const demoLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 5,
@@ -306,16 +333,20 @@ const demoLimit = rateLimit({
   legacyHeaders: false,
   message: { message: "Demo creation limit reached. Try again in an hour." },
 });
-app.post("/api/auth/demo", demoLimit, async (req, res) => {
-  if (!demoEnabled()) fail(404, "Visitor demo is not enabled");
-  if (req.actor)
-    fail(409, "Exit your current workspace before starting a demo");
-  const token = randomBytes(32).toString("hex"),
-    csrf = randomBytes(32).toString("hex");
-  const user = await provisionDemo({ id: hash(token), csrf }, req.sessionKey);
-  sessionCookie(res, token, user.demoExpiresAt!);
-  res.status(201).json({ user: publicUser(user), csrf });
-});
+app.post(
+  "/api/auth/demo",
+  production ? publicLimit("demo", 30, 60 * 60 * 1000, 5) : demoLimit,
+  async (req, res) => {
+    if (!demoEnabled()) fail(404, "Visitor demo is not enabled");
+    if (req.actor)
+      fail(409, "Exit your current workspace before starting a demo");
+    const token = randomBytes(32).toString("hex"),
+      csrf = randomBytes(32).toString("hex");
+    const user = await provisionDemo({ id: hash(token), csrf }, req.sessionKey);
+    sessionCookie(res, token, user.demoExpiresAt!);
+    res.status(201).json({ user: publicUser(user), csrf });
+  },
+);
 const dummyHash = argon2.hash(randomBytes(32));
 app.post("/api/auth/logout", async (req, res) => {
   if (req.actor?.isDemo) {
@@ -670,6 +701,29 @@ app.delete("/api/tasks/:id", async (req, res) => {
   });
   res.status(204).end();
 });
+app.use("/api", (_req, _res, next) =>
+  next(new HttpError(404, "Endpoint not found")),
+);
+if (production) {
+  const frontend = fileURLToPath(
+    new URL("../../../client/dist/", import.meta.url),
+  );
+  if (!existsSync(frontend + "index.html"))
+    throw new Error("Build the frontend before production start");
+  app.use(
+    "/assets",
+    express.static(frontend + "assets", {
+      immutable: true,
+      maxAge: "1y",
+      fallthrough: false,
+    }),
+  );
+  app.use(express.static(frontend, { index: false, maxAge: 0 }));
+  app.get("/{*path}", (req, res, next) => {
+    if (!req.accepts("html") || /\.[^/]+$/.test(req.path)) return next();
+    res.set("Cache-Control", "no-cache").sendFile(frontend + "index.html");
+  });
+}
 app.use((_req, _res, next) => next(new HttpError(404, "Endpoint not found")));
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof z.ZodError) {
@@ -695,6 +749,15 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
       res.status(404).json({ message: "Record no longer exists" });
       return;
     }
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "status" in error &&
+    error.status === 404
+  ) {
+    res.status(404).json({ message: "File not found" });
+    return;
   }
   if (error instanceof SyntaxError) {
     res.status(400).json({ message: "Invalid JSON request" });

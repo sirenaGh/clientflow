@@ -31,10 +31,15 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+      - name: Build production image
+        run: docker build --tag clientflow:ci .
+      - name: Inspect production image contents
+        run: docker run --rm --entrypoint sh clientflow:ci -c 'test ! -e /app/server/.env && test -f /app/client/dist/index.html && test -f /app/server/dist/src/index.js && test -f /app/server/dist/src/cleanup-demos.js'
       - run: npm run test:prepare
       - name: Verify isolated MySQL version
         run: node --import tsx scripts/check-test-database.mjs
       - run: npm test
+      - run: npm run test:production
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4

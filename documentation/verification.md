@@ -1,3 +1,25 @@
+# Railway preparation verification — 2026-10-18
+
+This revision prepares configuration only; no Railway services or deployment were created.
+
+- `npm run db:generate`: passed, Prisma client regenerated for the public rate-budget table.
+- `npm run lint`: passed after correcting a new smoke-test lint error.
+- `npm run typecheck`: passed for both workspaces.
+- `npm run build:production`: passed after rerunning with local child-process permission required by Vite. Builds the real frontend and compiled Express server.
+- `npm run test:prepare`: passed against the isolated `clientflow_test` database, including the new third migration. This helper deliberately seeds only that test database; deployment uses `npm run db:migrate` without seeds or resets.
+- `npm run test:production`: passed. Starts the compiled server with `NODE_ENV=production` and a fresh test-only secret. Checks database readiness without session creation; index and SPA route; hashed JS asset and cache policy; missing asset 404; unauthenticated JSON API errors and authenticated unknown-API 404; Secure/HttpOnly/SameSite cookie flags; incorrect-origin CSRF rejection; persistent global rate rejection despite forged forwarding headers; two simultaneous compiled cleanup processes exiting successfully, deleting the expired demo and preserving normal users. The initial smoke assertion reused a revoked anonymous session; the test was corrected to obtain a fresh session, retaining the 429 assertion.
+- Existing integration cases passed before adding the new concurrency case: 5 passed, no failures or skips. They cover login/logout/session expiry, CSRF, CRM lifecycle and persistence, metrics, cross-user authorization, real ownership locking, demo isolation, fixed expiry, quotas and cleanup.
+- Final `npm test`: **6 passed, 0 failed, 0 skipped** (32.39 seconds). The added test sends ten concurrent requests to a three-request MySQL budget, asserts exactly three successes and seven 429 responses, verifies persistence across middleware instances and checks an independent per-session ceiling. Its initial oversized test-only bucket prefix was shortened to fit the documented table key capacity; production bucket names were already within bounds. A sandbox-blocked run could not spawn test workers; the full rerun with process permission passed.
+- `node --import tsx scripts/check-test-database.mjs`: passed, reporting local MySQL 8.0.32.
+- Final `npm run test:e2e`: **6 passed, 0 failed** (4.6 minutes): desktop and mobile credential-free demo/isolation/persistence/exit/expiry; deletion/filtered pagination/open-app session recovery; normal sign-in/relationship creation/opportunity progression/reload persistence.
+- Final lint and workspace type checks passed after the new test was added.
+
+Local MySQL is 8.0.32. MySQL 8.4 migration/integration verification is delegated to the unchanged-version CI service; consult the PR's actual Actions run for its result. CI additionally builds the Docker image and runs the production smoke path. Docker is not installed locally, so no local container build is claimed. Real Railway DNS/private networking, TLS termination, runtime limits and scheduler behavior remain unverified until an explicitly authorized deployment. Browser mobile coverage is Chromium device emulation.
+
+See [Railway setup](railway.md) for exact service commands, variables, operational bounds and post-deployment checks. Historical verification records follow.
+
+---
+
 # Source publication verification
 
 Local pre-publication checks completed on **2026-10-18** (local timezone). GitHub's authenticated API account was verified as **sirenaGh**. The target repository did not exist at inspection; the reviewed source is intended for its new `main` branch. No application deployment is included.

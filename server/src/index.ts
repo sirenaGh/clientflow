@@ -2,8 +2,9 @@ import { app } from "./app.js";
 import { db } from "./db.js";
 const port = Number(process.env.PORT || 3001);
 await db.$connect();
-const server = app.listen(port, "127.0.0.1", () =>
-  console.log(`ClientFlow API: http://127.0.0.1:${port}`),
+const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+const server = app.listen(port, host, () =>
+  console.log(`ClientFlow API: http://${host}:${port}`),
 );
 const cleanup = setInterval(
   () => {
