@@ -14,6 +14,7 @@
     "prisma/seed.ts",
     "prisma/review-fixtures.ts",
     "test",
-    "prisma.config.ts"
+    "prisma.config.ts",
+    "database-config.ts"
   ]
 }

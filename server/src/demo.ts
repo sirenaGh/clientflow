@@ -158,10 +158,16 @@ export function provisionDemo(
 }
 
 // Lock the same stable owner row as CRM writes; recheck expiry after acquiring it.
-export async function cleanupExpiredDemos(now = new Date(), store = db) {
+export async function cleanupExpiredDemos(
+  now = new Date(),
+  store = db,
+  limit = 25,
+) {
   const candidates = await store.user.findMany({
     where: { isDemo: true, demoExpiresAt: { lte: now } },
     select: { id: true },
+    orderBy: { id: "asc" },
+    take: limit,
   });
   let removed = 0;
   for (const { id } of candidates) {

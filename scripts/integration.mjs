@@ -10,6 +10,7 @@ const r = spawnSync(
     "server/test/ownership.test.ts",
     "server/test/demo.test.ts",
     "server/test/public-limits.test.ts",
+    "server/test/deployment.test.ts",
   ],
   { env: testEnv(), stdio: "inherit" },
 );

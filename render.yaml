@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: clientflow
+    runtime: docker
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: node scripts/start-render.mjs
+    autoDeployTrigger: "off"
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DB_TLS_REQUIRED
+        value: "true"
+      - key: DB_TLS_CA_FILE
+        value: /etc/secrets/aiven-ca.pem
+      - key: DEMO_ENABLED
+        value: "false"
+      - key: DEMO_CLEANUP_ENABLED
+        value: "true"
