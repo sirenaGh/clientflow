@@ -25,7 +25,10 @@
     "start": "npm run start -w server",
     "build:production": "npm run db:generate && npm run build",
     "demo:cleanup:production": "node server/dist/src/cleanup-demos.js",
-    "test:production": "node scripts/production-smoke.mjs"
+    "test:production": "node scripts/production-smoke.mjs",
+    "start:render": "node scripts/start-render.mjs",
+    "db:migrate:production": "node scripts/migrate-production.mjs",
+    "test:tls": "node scripts/tls-ci.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

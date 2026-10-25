@@ -40,6 +40,9 @@ jobs:
         run: node --import tsx scripts/check-test-database.mjs
       - run: npm test
       - run: npm run test:production
+      - name: Verify adapter and migration TLS using isolated MySQL
+        timeout-minutes: 5
+        run: npm run test:tls
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4

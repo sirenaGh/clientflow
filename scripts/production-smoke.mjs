@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { testEnv } from "./test-env.mjs";
 const env = {
@@ -7,6 +7,7 @@ const env = {
   NODE_ENV: "production",
   APP_ORIGIN: "https://clientflow.example",
   PORT: "3089",
+  DEMO_CLEANUP_ENABLED: "true",
   SESSION_SECRET: randomBytes(32).toString("hex"),
 };
 process.env.DATABASE_URL = env.DATABASE_URL;
@@ -16,8 +17,29 @@ await db.publicRateBucket.deleteMany({
     OR: [{ key: { startsWith: "demo:" } }, { key: { startsWith: "session:" } }],
   },
 });
+const failedStartup = spawnSync(
+  process.execPath,
+  ["scripts/start-render.mjs"],
+  {
+    env: {
+      ...env,
+      DB_TLS_REQUIRED: "true",
+      DB_TLS_CA_FILE: "/missing-clientflow-ca.pem",
+    },
+    encoding: "utf8",
+    timeout: 30000,
+  },
+);
+assert.equal(
+  failedStartup.status,
+  1,
+  "Missing trust material must prevent startup",
+);
+const privateOutput = failedStartup.stdout + failedStartup.stderr;
+assert.ok(!privateOutput.includes(env.DATABASE_URL));
+assert.ok(!privateOutput.includes(env.SESSION_SECRET));
 const base = "http://127.0.0.1:3089";
-const child = spawn(process.execPath, ["server/dist/src/index.js"], {
+const child = spawn(process.execPath, ["scripts/start-render.mjs"], {
   env,
   stdio: ["ignore", "pipe", "pipe"],
 });

@@ -1,3 +1,26 @@
+# Render Free preparation verification - 2026-10-25
+
+This revision prepares one Render Free Docker service and an external Aiven MySQL Free connection. No hosting services, deployment, payment method or paid job was created. Railway JSON configuration and the Docker default command are unchanged.
+
+Local checks actually executed:
+
+- `npm run lint`: passed.
+- `npm run typecheck`: passed in both workspaces, including the shared TLS configuration.
+- `npm run build:production`: passed (Prisma generation, React production build, Express compilation). `npm run build -w server` also passed after startup-maintenance wiring.
+- `npm run test:prepare`: passed against isolated `clientflow_test`; three migrations, none pending. The first attempts failed because the previously configured loopback MySQL was stopped; it was restarted using `npm run setup:local` only after verifying existing data/ready markers. Its data and environment were preserved. No normal database reset or production seeding was performed.
+- `npm test`: final run **8 passed, 0 failed, 0 skipped** (43.82 seconds). Existing login/session, authorization/locking, CRUD/persistence/metrics, demo isolation/expiry/quotas and shared-limit tests passed. New cases reject missing CA, insecure/unsupported TLS flags and relative CA paths; ensure invalid URLs do not leak their input; and verify cleanup batch limits, overlap coalescing and preservation of active demos/normal users. An earlier run found an additional expired test demo from the previous week's session; isolated preparation now removes expired demo fixtures before seeding. Assertions were retained.
+- `npm run test:production`: passed using `scripts/start-render.mjs`, exercising real migration-before-start and the built server/frontend. It verifies missing trust material prevents startup and output excludes the database URL/session secret; production SPA/assets/API errors, Secure cookie flags, CSRF, persisted public limits, and overlapping compiled cleanup remain covered. In-process maintenance is enabled for this test.
+- `node --import tsx scripts/check-test-database.mjs`: local MySQL **8.0.32**.
+- `npm run test:e2e`: **6 passed, 0 failed** (3.0 minutes), covering desktop/mobile visitor entry, sample editing, isolation, persistence, exit and expiry; deletion, filtered pagination and session recovery; and normal authenticated relationship/deal workflows.
+
+Account-independent CI adds `npm run test:tls`: an isolated MySQL 8.4 container with a generated test CA/server certificate and mandatory secure transport. It checks an encrypted adapter query, successful strict TLS migration, zero seeded users, and rejection by **both** adapter and migration commands of an untrusted CA and hostname mismatch. Generated keys/credentials stay in ignored ephemeral CI storage and are not uploaded. The fixture uses no hosting account. Docker is unavailable locally, so no local TLS-container result is claimed; the actual PR Actions result is authoritative. Existing MySQL 8.4 integration, Docker-build and browser checks remain enabled.
+
+Unverified without hosting accounts: the actual Aiven Free offering/version, its certificate chain and network allowlist; Render Blueprint acceptance/runtime secret-file mounting; actual HTTPS cookie/proxy behavior; sleep/wake timings and platform usage limits. The local production smoke uses loopback HTTP with explicitly supplied Cookie headers; it does not simulate a real TLS-terminated browser session. Mobile coverage is Chromium device emulation. The Blueprint was inspected against current official documentation, not submitted to Render.
+
+See [Render Free setup](render-free.md) for exact variables, commands, limitations and official references. Historical verification follows.
+
+---
+
 # Railway preparation verification — 2026-10-18
 
 This revision prepares configuration only; no Railway services or deployment were created.

@@ -9,6 +9,7 @@ for (const args of [
     "--config",
     "server/prisma.config.ts",
   ],
+  ["node_modules/tsx/dist/cli.mjs", "server/src/cleanup-demos.ts"],
   ["node_modules/tsx/dist/cli.mjs", "server/prisma/seed.ts"],
 ]) {
   const r = spawnSync(process.execPath, args, { env, stdio: "inherit" });

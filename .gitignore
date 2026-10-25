@@ -22,3 +22,9 @@ coverage/
 *.dump
 *.db
 *.sqlite*
+
+# Database trust material and private keys stay outside source control.
+*.pem
+*.key
+*.crt
+*.p12

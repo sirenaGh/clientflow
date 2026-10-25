@@ -22,3 +22,6 @@ test-results
 playwright-report
 coverage
 documentation
+
+**/*.crt
+**/*.p12
