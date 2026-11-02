@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type User } from "@prisma/client";
 import { db } from "./db.js";
 import { HttpError } from "./errors.js";
+import {
+  demoProvisioningFailure,
+  type DemoOperation,
+} from "./demo-diagnostics.js";
 
 export const demoEnabled = () => process.env.DEMO_ENABLED === "true";
 export const DEMO_LIFETIME_MS = 60 * 60 * 1000;
@@ -40,10 +44,13 @@ export async function checkDemoLimit(
 export function provisionDemo(
   session: { id: string; csrf: string },
   previousSession?: string,
+  store: Pick<typeof db, "$transaction"> = db,
 ) {
   const expiresAt = new Date(Date.now() + DEMO_LIFETIME_MS);
-  return db.$transaction(
+  let operation: DemoOperation = "transaction.begin";
+  const transaction = store.$transaction(
     async (tx) => {
+      operation = "user.create";
       const user = await tx.user.create({
         data: {
           name: "Demo Visitor",
@@ -61,6 +68,7 @@ export function provisionDemo(
       const contacts = ["Alex Rowan", "Casey Vale", "Morgan Reed"];
       const companies = [];
       for (let i = 0; i < names.length; i++) {
+        operation = "company.create";
         const company = await tx.company.create({
           data: {
             name: names[i],
@@ -70,6 +78,7 @@ export function provisionDemo(
             assignedToId: user.id,
           },
         });
+        operation = "contact.create";
         const contact = await tx.contact.create({
           data: {
             name: contacts[i],
@@ -99,6 +108,7 @@ export function provisionDemo(
       ];
       for (let i = 0; i < stages.length; i++) {
         const { company, contact } = companies[i % companies.length];
+        operation = "opportunity.create";
         const opportunity = await tx.opportunity.create({
           data: {
             title: titles[i],
@@ -119,7 +129,8 @@ export function provisionDemo(
               "Fictional sample opportunity. Explore the pipeline and plan the next conversation.",
           },
         });
-        if (i < 2)
+        if (i < 2) {
+          operation = "note.create";
           await tx.note.create({
             data: {
               opportunityId: opportunity.id,
@@ -127,7 +138,9 @@ export function provisionDemo(
               body: "Discovery conversation completed. Prepare a proposal covering the sample team's requirements.",
             },
           });
-        if (i < 5)
+        }
+        if (i < 5) {
+          operation = "task.create";
           await tx.task.create({
             data: {
               title: [
@@ -143,18 +156,27 @@ export function provisionDemo(
               completed: i === 4,
             },
           });
+        }
       }
-      if (previousSession)
+      if (previousSession) {
+        operation = "anonymous-session.delete";
         await tx.session.deleteMany({
           where: { id: previousSession, userId: null },
         });
+      }
+      operation = "authenticated-session.create";
       await tx.session.create({
         data: { ...session, userId: user.id, expiresAt },
       });
+      operation = "transaction.commit";
       return user;
     },
     { timeout: 10000 },
   );
+  return transaction.catch((error: unknown) => {
+    // Catch outside the transaction so failure still rolls every insert back.
+    throw demoProvisioningFailure(operation, error);
+  });
 }
 
 // Lock the same stable owner row as CRM writes; recheck expiry after acquiring it.

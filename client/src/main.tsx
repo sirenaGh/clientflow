@@ -121,6 +121,7 @@ function App() {
     [revision, setRevision] = useState(0);
   const refresh = () => setRevision((v) => v + 1);
   const sessionGeneration = React.useRef(0);
+  const bootSession = React.useRef<Promise<Row> | null>(null);
   useEffect(() => {
     const expired = () => {
       sessionGeneration.current++;
@@ -145,7 +146,10 @@ function App() {
     window.scrollTo(0, 0);
   }, [user?.id, page, detail?.id]);
   useEffect(() => {
-    api("/auth/session")
+    // Reuse one bootstrap request when development StrictMode re-runs effects.
+    // Two anonymous responses could otherwise replace the cookie/token pair.
+    bootSession.current ??= api("/auth/session");
+    bootSession.current
       .then((s) => {
         csrf = s.csrf;
         setDemoEnabled(s.demoEnabled);

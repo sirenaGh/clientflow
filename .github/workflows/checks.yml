@@ -44,6 +44,8 @@ jobs:
         timeout-minutes: 5
         run: npm run test:tls
       - run: npx playwright install --with-deps chromium
+      - name: First visitor on migrations-only MySQL
+        run: npm run test:demo:pristine
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -17,7 +17,7 @@
     "setup:local": "node scripts/local-setup.mjs",
     "test:prepare": "node scripts/test-database.mjs",
     "test": "node scripts/integration.mjs",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/browser.mjs",
     "db:generate": "npm run db:generate -w server",
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
@@ -28,7 +28,8 @@
     "test:production": "node scripts/production-smoke.mjs",
     "start:render": "node scripts/start-render.mjs",
     "db:migrate:production": "node scripts/migrate-production.mjs",
-    "test:tls": "node scripts/tls-ci.mjs"
+    "test:tls": "node scripts/tls-ci.mjs",
+    "test:demo:pristine": "node scripts/test-demo-pristine.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
