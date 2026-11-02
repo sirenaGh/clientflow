@@ -151,3 +151,7 @@ The [review guide](documentation/review-guide.md) maps code and evidence for ind
 Deployment preparation: see [Railway setup](documentation/railway.md). No application deployment is configured or performed by GitHub Actions.
 
 For a strictly free portfolio option, see [Render Free and Aiven MySQL](documentation/render-free.md). The Railway deployment configuration remains available.
+
+For demo startup diagnosis and the migrations-only browser regression, see [Demo provisioning investigation](documentation/demo-provisioning-investigation.md).
+
+`npm run test:e2e` runs the bootstrap regression and the CRM workflows in separate fresh test-server groups so their login attempts do not share a rate-limit budget. Application limits, assertions and retries remain unchanged.

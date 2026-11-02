@@ -1,3 +1,58 @@
+# Diagnostic review and login comparison - 2026-11-02
+
+The production demo P2003/409 remains unconfirmed. This change adds diagnostics, not a confirmed production-data fix. No production database was accessed, seeded or reset.
+
+Matched local comparison on Windows MySQL **8.4.13**, verified database TLS, Node 24, the same installed Chromium, serial workers, zero retries and unchanged timeouts:
+
+- `node .runtime/mysql84/run-comparison.mjs main prepare` and `branch prepare`: production migrations plus identical development fixtures in **separate newly created disposable comparison databases**. Main was a clean export of `87a31fe`. Checksums matched the pre-fix client, workflow test, controlled test, Playwright config and Express routes.
+- `node .runtime/mysql84/run-comparison.mjs main browser`: original desktop/mobile workflow **2 passed**; controlled bootstrap interleaving **2 failed** (expected incorrect-password 401, received CSRF 403).
+- `node .runtime/mysql84/run-comparison.mjs branch browser` before fix: exactly the same **2 passed / 2 expected reproducer failures**, with 403 on both devices. This establishes that the race predates the diagnostics.
+- Same branch command after the minimal request-deduplication fix: **4 passed, 0 failed** (1.4 minutes). Existing login assertions and server CSRF protection were unchanged. The new case additionally requires one bootstrap GET, one mutation POST and rejection of a wrong Origin.
+- One attempted comparison was aborted before useful results because a local editing command hit a text-encoding error; the file was not changed by that failed command. The valid post-fix result above used the successfully applied UTF-8 patch.
+
+Confirmed cause: the development bootstrap effect could issue duplicate anonymous-session GETs, allowing cookie/token replacement to race with login. The earlier timeout-only result was not reproduced in the matched serial workflow runs; its exact timing/cancellation cause remains unconfirmed. No retry was used to turn a failed assertion green.
+
+Final local checks, run against disposable MySQL 8.4.13 with verified database TLS:
+
+| Command | Actual result |
+| --- | --- |
+| `npm run lint` | Passed after all source/runner changes. |
+| `npm run typecheck` | Both workspaces passed. |
+| `npm run build:production` | Prisma generation, frontend and server builds passed. |
+| `node .runtime/mysql84/run-suite.mjs backend` | **11 passed, 0 failed, 0 skipped**, runner 41.01 seconds. Includes data-minimized logging and controlled real FK rollback. |
+| `node .runtime/mysql84/run-suite.mjs production` | Passed; compiled startup, health/assets/SPA/API, cookies, CSRF, shared budgets and cleanup. |
+| `node .runtime/mysql84/run-pristine.mjs` | Passed; another new empty database, production migrations only, no development seeds, desktop/mobile demo/dashboard, isolation, quotas and expiry. |
+| `node .runtime/mysql84/run-suite.mjs browser` using `scripts/browser.mjs` (the `npm run test:e2e` entry point) | **8 passed, 0 failed**: bootstrap group 2 passed (1.6 minutes), original workflow group 6 passed (3.2 minutes). Fresh servers per group; zero retries and unchanged assertions/timeouts/limits. |
+
+The first combined eight-case run was **7 passed / 1 failed**: the last correct-password login received 429 after the suite exceeded the development ten-attempt per-IP budget. The two new bootstrap cases added two attempts to an original suite using ten. This was verified from response status and rate-limit headers, without printing cookie/token/credential values. The test runner now isolates the two groups with fresh servers and stops on any failure. No rate limit was raised or disabled. This setup correction is separate from the pre-existing client race.
+
+The private local wrappers only supply generated disposable URLs/CA files; none target production. The verified server diagnostic contains a fixed operation and validated Prisma/MySQL codes only. The real late-session FK test rolls back every workspace record and restores the previous anonymous session. Known-secret/branding/credential scans passed on the reviewed files. Remote results should be read from the actual PR checks for its published commit; no local result is represented as a remote CI pass. No production access, reset, seed or deployment was performed. Historical diagnostic records follow.
+
+---
+
+# Demo startup investigation verification - 2026-11-02
+
+**The deployed 409 was not reproduced.** Production was not contacted or modified. The unchanged baseline and the post-change production build both passed first-visitor testing on separate empty Windows MySQL **8.4.13** databases using all three production migrations and no development seeds. No seed-only reference dependency was established. See [the investigation](demo-provisioning-investigation.md) for the request trace, exact P2003 response origin, diagnostics and remaining uncertainty.
+
+Actual local checks:
+
+- `npm run build:production`: passed before and after instrumentation (Prisma generation, frontend build, Express compilation).
+- `npm run typecheck` and `npm run lint`: passed. Initial type errors in the new rollback test were corrected before the final successful checks; no assertions were removed.
+- `node .runtime/mysql84/run-pristine.mjs` (baseline): passed against a newly initialized, empty MySQL 8.4.13 database. This private wrapper supplies only local disposable credentials/CA and executes `node scripts/test-demo-pristine.mjs`, equivalent to `npm run test:demo:pristine`. It verifies empty tables before migrations and zero CRM/session/rate records after migrations, then drives real HTTPS browser requests against the production build.
+- The first attempt stopped at database connection authentication before any migration or demo request. The disposable server was configured with a generated test CA and mandatory TLS; the adapter and migration kept CA/hostname verification enabled. This fixture issue is distinct from the reported P2003/409. The successful baseline and post-change runs used verified database TLS.
+- `node .runtime/mysql84/run-pristine.mjs` (post-change): passed on a **second new empty database**, without resetting or seeding the first. Desktop and mobile visitors received 201 and loaded the dashboard; reload persistence, independent identities, direct-ID read/write rejection, company quota and fixed server-side expiry passed. All application tables were empty before entry. A self-signed local HTTPS proxy is used solely to exercise production Secure cookies and Origin checks; its browser certificate exception does not disable database verification.
+- `node .runtime/mysql84/run-suite.mjs prepare`: passed. This private wrapper invokes `scripts/test-database.mjs` with another, separate disposable MySQL 8.4 database. Only this full-suite fixture database received development seeds; the two migrations-only databases did not. No normal development or production database was reset/seeded.
+- `node .runtime/mysql84/run-suite.mjs backend`: **11 passed, 0 failed, 0 skipped** (101.39 seconds). Runs the existing integration suite plus three diagnostics tests. Coverage includes login/logout/session security, cross-user CRUD/relationship constraints, real ownership locking, persistence/metrics, demo isolation/expiry/all record quotas, shared public limits, bounded maintenance, diagnostic data minimization, correct operation attribution and real MySQL foreign-key rollback. A controlled invalid session userId produced P2003/MySQL 1452; all workspace inserts rolled back and the anonymous session remained. This deliberate fault is not claimed as the cause of the deployed incident.
+- `node .runtime/mysql84/run-suite.mjs production`: passed. Covers compiled startup/migration failure handling, health without sessions, SPA/assets/API behavior, Secure cookie flags, CSRF, public limits and overlapping cleanup.
+- `node .runtime/mysql84/run-suite.mjs browser`: **5 passed, 1 failed** on each of two unchanged full-suite runs. First run: mobile incorrect-password login expected an "incorrect" alert but received an invalid-CSRF response. Second run without concurrent production build: desktop incorrect-password login timed out waiting for that alert; the mobile workflow passed. Both runs passed desktop/mobile demo and deletion/pagination/session-recovery cases. No assertions were weakened, retries enabled, or unrelated login code changed. These existing development-server login checks remain a limitation; they are distinct from the reported P2003/409 and from the successful migrations-only production browser regression.
+- Final production rebuild, lint and workspace type checks passed. Changed-file audit found no known secrets, credential patterns, runtime artifacts or accidental tool branding across all 12 changed/new project files.
+
+The private runtime wrappers hold generated disposable credentials outside Git and merely select the explicit test URLs. Standard commands and required variables are documented in the investigation. No new GitHub Actions run was executed because nothing was pushed. Future workflow wiring creates a dedicated empty database for the new `test:demo:pristine` check, separate from seeded test fixtures. No migration/schema repair, production seed, push or deployment was performed.
+
+Remaining uncertainty: the actual failing operation/code on the deployed database, its schema/configuration and deployed artifact were not inspected. If the reviewed diagnostics are later deployed with authorization, the safe operation/Prisma/MySQL-code log identifies the next targeted investigation. The local reproduction is Windows MySQL 8.4.13, not an Aiven instance. Mobile tests use Chromium device emulation. Historical verification follows.
+
+---
+
 # Render Free preparation verification - 2026-10-25
 
 This revision prepares one Render Free Docker service and an external Aiven MySQL Free connection. No hosting services, deployment, payment method or paid job was created. Railway JSON configuration and the Docker default command are unchanged.

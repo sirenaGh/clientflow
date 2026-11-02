@@ -14,7 +14,7 @@ const result = spawnSync(
   "docker",
   ["exec", "-i", process.env.MYSQL_CONTAINER, "mysql", "--user=root"],
   {
-    input: `CREATE USER 'clientflow_ci'@'%' IDENTIFIED BY '${password}'; GRANT ALL ON clientflow_test.* TO 'clientflow_ci'@'%'; DROP USER IF EXISTS 'root'@'%'; ALTER USER 'root'@'localhost' IDENTIFIED BY '${rootPassword}';`,
+    input: `CREATE USER 'clientflow_ci'@'%' IDENTIFIED BY '${password}'; GRANT ALL ON clientflow_test.* TO 'clientflow_ci'@'%'; CREATE DATABASE clientflow_demo_pristine_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL ON clientflow_demo_pristine_test.* TO 'clientflow_ci'@'%'; DROP USER IF EXISTS 'root'@'%'; ALTER USER 'root'@'localhost' IDENTIFIED BY '${rootPassword}';`,
     encoding: "utf8",
   },
 );
@@ -23,6 +23,7 @@ if (result.status !== 0)
 const env = {
   DATABASE_URL: `mysql://clientflow_ci:${password}@127.0.0.1:3306/clientflow_unused`,
   TEST_DATABASE_URL: `mysql://clientflow_ci:${password}@127.0.0.1:3306/clientflow_test`,
+  DEMO_TEST_DATABASE_URL: `mysql://clientflow_ci:${password}@127.0.0.1:3306/clientflow_demo_pristine_test`,
   SESSION_SECRET: random(),
   SEED_ADMIN_PASSWORD: random(),
   SEED_SALES_ONE_PASSWORD: random(),
